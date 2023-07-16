@@ -4,6 +4,10 @@ using SealedClass_Console.Services;
 
 Console.WriteLine("Program start");
 
-var summary = BenchmarkRunner.Run<PerformanceBenchmark>();
+//// run on specific benchmark test class
+//var summary = BenchmarkRunner.Run<PerformanceBenchmark>();
+
+//// run all benchmark test classes (if having multiple benchmark test classes)
+_ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
 
 Console.WriteLine("Program end");

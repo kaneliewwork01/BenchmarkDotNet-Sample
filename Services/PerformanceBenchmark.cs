@@ -4,6 +4,8 @@ using SealedClass_Console.Entities;
 
 namespace SealedClass_Console.Services;
 
+[MinColumn, MaxColumn, Q1Column, Q3Column, AllStatisticsColumn]
+[JsonExporterAttribute.Full]
 [Orderer(SummaryOrderPolicy.FastestToSlowest)]
 public class PerformanceBenchmark
 {

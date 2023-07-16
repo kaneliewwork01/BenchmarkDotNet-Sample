@@ -1,0 +1,69 @@
+on:
+  # this reuseable workflow is a customization of the generic reuseable workflow provided to all teams
+  # customization is needed as we have not been able to identify a way to pass in secrets defined at the
+  # repo level to to the test setup
+  workflow_call:
+    inputs:
+      # section for product relevant input
+      Mean:
+        description: "Threshold of the MEAN time in nanoseconds (ns). If any of the benchmark test Mean time more than the value will mark the test as failed."
+        required: true
+        type: number
+        default: 400000
+
+jobs:
+  micro-benchmark-tests:   
+    timeout-minutes: 10
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+      - rd-large
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 6.0.x
+
+      - name: Setup bc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc
+          dotnet tool install -g BenchmarkDotNet.Tool
+
+      - name: Restore dependencies
+        run: dotnet restore ./SealedClass_Console.csproj
+
+      - name: Build project
+        run: dotnet build ./SealedClass_Console.csproj --configuration Release
+
+      - name: Run Benchmark Tests      
+        run: |
+            dotnet run --no-restore --configuration Release --project ./SealedClass_Console.csproj -- -f '*'
+
+            # Save the benchmark results to a file
+            dotnet run --no-restore --configuration Release --project ./SealedClass_Console.csproj -- --exporters markdown,brief -r ./BenchmarkDotNet.Artifacts/results
+
+      - name: Threshold checking - Mean Time
+        run: |
+            # Read the JSON report file
+            report=$(cat ./BenchmarkDotNet.Artifacts/results/*-report-full.json)
+    
+            # Extract the mean time for each benchmark iteration
+            meanTimes=$(echo "$report" | jq -r '.Benchmarks[].Statistics.Mean')
+
+            # Define the threshold for mean time in nanoseconds. eg: 400000 = 400 microseconds (us), 0.0004 seconds.
+            threshold=${{ inputs.Mean }}
+
+            # Iterate over the mean time values and check if any exceed the threshold
+            for meanTime in $meanTimes; do
+                if (( $(bc <<< "$meanTime > $threshold") )); then
+                echo "Mean time $meanTime ns exceeds the threshold of $threshold ns. Test failed."
+                exit 1
+                fi
+            done
+
+            echo "All benchmark tests passed."
